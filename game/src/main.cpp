@@ -14,10 +14,8 @@ float dt = 1.0f / TARGET_FPS; //seconds/frame
 float time = 0;
 
 Vector2 launchPosition = { 200, 200 };
-//Vector2 launchVelocity = { 200, 0 };
 float launchAngle = 300.0f;
 float launchSpeed = 200.0f;
-Vector2 launchVelocity = { 0, 0 };
 
 //Changes world state
 void update()
