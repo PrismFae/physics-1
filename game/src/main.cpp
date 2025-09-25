@@ -9,16 +9,19 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "raygui.h"
 #include "game.h"
 #include <vector>
+#include <iostream>
+
+using namespace std;
 
 struct PhysicsBody
 {
 	Vector2 position = Vector2Zeros; // 0 by default (Zeroes for constant)
 	Vector2 velocity = Vector2Zeros;
 	float drag = 1.0f; // No dampening by default
-	float mass; 
+	// float mass; 
 };
 
-class PhysicisSimulation
+class PhysicsSimulation
 {
 	float dt = 1.0f / TARGET_FPS; //seconds/frame
 	float time = 0;
@@ -26,22 +29,32 @@ class PhysicisSimulation
 	Vector2 gravity = { 0, 9.81f }; // Gravity acceleration
 
 public:
+	const unsigned int TARGET_FPS = 50; //frames/second
 	std::vector<PhysicsBody> objects;
 
 	void updateTime()
 	{
 		time += dt;
 	}
+
+	void UpdateObjectPositions()
+	{
+		for (int i = 0; i < objects.size(); ++i)
+		{
+			PhysicsBody& o = objects[i];
+			o.velocity += gravity * dt;
+			o.position += o.velocity * dt;
+		}
+	}
 };
 
-const unsigned int TARGET_FPS = 50; //frames/second
 
 Vector2 launchPosition = { 200, 200 };
 float launchAngle = 300.0f;
 float launchSpeed = 200.0f;
 
 //Display world state
-void draw()
+void draw(PhysicsSimulation& sim)
 {
 	BeginDrawing();
 	ClearBackground(WHITE);
@@ -69,16 +82,18 @@ void draw()
 	Vector2 velocityVector = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
 	DrawLineV(launchPosition, launchPosition + velocityVector, RED);
 
-	EndDrawing();
+	for (const PhysicsBody& o : sim.objects)
+		DrawCircleV(o.position, 10, RED);
 
+	EndDrawing();
 }
 
 int main()
 {
-	InitWindow(InitialWidth, InitialHeight, "Angry Birds");
-	SetTargetFPS(TARGET_FPS);
+	PhysicsSimulation sim;
 
-	PhysicisSimulation sim;
+	InitWindow(InitialWidth, InitialHeight, "Angry Birds");
+	SetTargetFPS(sim.TARGET_FPS);
 
 	while (!WindowShouldClose()) // Loops TARGET_FPS times per second
 	{
@@ -86,14 +101,29 @@ int main()
 		{
 			PhysicsBody b;
 			b.position = launchPosition;
-
-			DrawCircleV(b.position, 10, RED);
+			b.velocity = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
 			
 			sim.objects.push_back(b);
 		}
 
+		if (IsKeyPressed(KEY_U))
+			launchAngle = 0;
+		else if (IsKeyPressed(KEY_I))
+			launchAngle = 45;
+		else if (IsKeyPressed(KEY_O))
+			launchAngle = 60;
+		else if (IsKeyPressed(KEY_P))
+			launchAngle = 90;
+		else if (IsKeyPressed(KEY_J))
+			launchAngle = 315;
+		else if (IsKeyPressed(KEY_K))
+			launchAngle = 300;
+		else if (IsKeyPressed(KEY_L))
+			launchAngle = 270;
+
 		sim.updateTime();
-		draw();
+		sim.UpdateObjectPositions();
+		draw(sim);
 	}
 
 	CloseWindow();
