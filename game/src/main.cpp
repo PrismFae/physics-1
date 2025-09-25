@@ -8,21 +8,37 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 #include "game.h"
+#include <vector>
+
+struct PhysicsBody
+{
+	Vector2 position = Vector2Zeros; // 0 by default (Zeroes for constant)
+	Vector2 velocity = Vector2Zeros;
+	float drag = 1.0f; // No dampening by default
+	float mass; 
+};
+
+class PhysicisSimulation
+{
+	float dt = 1.0f / TARGET_FPS; //seconds/frame
+	float time = 0;
+
+	Vector2 gravity = { 0, 9.81f }; // Gravity acceleration
+
+public:
+	std::vector<PhysicsBody> objects;
+
+	void updateTime()
+	{
+		time += dt;
+	}
+};
 
 const unsigned int TARGET_FPS = 50; //frames/second
-float dt = 1.0f / TARGET_FPS; //seconds/frame
-float time = 0;
 
 Vector2 launchPosition = { 200, 200 };
 float launchAngle = 300.0f;
 float launchSpeed = 200.0f;
-
-//Changes world state
-void update()
-{
-	dt = 1.0f / TARGET_FPS;
-	time += dt;
-}
 
 //Display world state
 void draw()
@@ -62,9 +78,21 @@ int main()
 	InitWindow(InitialWidth, InitialHeight, "Angry Birds");
 	SetTargetFPS(TARGET_FPS);
 
+	PhysicisSimulation sim;
+
 	while (!WindowShouldClose()) // Loops TARGET_FPS times per second
 	{
-		update();
+		if (IsKeyPressed(KEY_SPACE))
+		{
+			PhysicsBody b;
+			b.position = launchPosition;
+
+			DrawCircleV(b.position, 10, RED);
+			
+			sim.objects.push_back(b);
+		}
+
+		sim.updateTime();
 		draw();
 	}
 
