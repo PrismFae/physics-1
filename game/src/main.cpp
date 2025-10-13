@@ -9,9 +9,12 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "raygui.h"
 #include "game.h"
 #include <vector>
-#include <iostream>
 
-using namespace std;
+//struct Circle
+//{
+//	Vector2 position = Vector2Zeros;
+//	float radius = 0.0f;
+//};
 
 struct PhysicsBody
 {
@@ -19,6 +22,11 @@ struct PhysicsBody
 	Vector2 velocity = Vector2Zeros;
 	float drag = 1.0f; // No dampening by default
 	// float mass; 
+	float gravityScale = 1.0f;
+	bool collision = false; // If the body collided this frame
+	Color color = MAGENTA;
+
+	float radius = 0.0f;
 };
 
 class PhysicsSimulation
@@ -42,9 +50,38 @@ public:
 		for (int i = 0; i < objects.size(); ++i)
 		{
 			PhysicsBody& o = objects[i];
-			o.velocity += gravity * dt;
+			Vector2 acc = gravity * o.gravityScale;
+
+			o.velocity += acc * dt;
 			o.position += o.velocity * dt;
+
+			// Reset every loop
+			o.collision = false;
 		}
+	}
+
+	void CheckCollision()
+	{
+		for (int i = 0; i < objects.size(); ++i)
+		{
+			for (int j = i + 1; j < objects.size(); ++j)
+			{
+				PhysicsBody& a = objects[i];
+				PhysicsBody& b = objects[j];
+				bool collision = CircleCircle(a.position, a.radius, b.position, b.radius);
+				a.collision |= collision;
+				b.collision |= collision; // only if single true
+			}
+		}
+	}
+
+	bool CircleCircle(Vector2 pos1, float rad1, Vector2 pos2, float rad2)
+	{
+		// distance calculated by pythagorean
+		float distance = Vector2Distance(pos1, pos2);
+
+		// If distance between the two radius are less than or equal to distance calculated
+		return distance <= (rad1 + rad2);
 	}
 };
 
@@ -88,7 +125,7 @@ void draw(PhysicsSimulation& sim)
 	DrawLineV(launchPosition, launchPosition + velocityVector, RED);
 
 	for (const PhysicsBody& o : sim.objects)
-		DrawCircleV(o.position, 10, RED);
+		DrawCircleV(o.position, o.radius, o.collision ? RED : o.color);
 
 	EndDrawing();
 }
@@ -96,12 +133,40 @@ void draw(PhysicsSimulation& sim)
 int main()
 {
 	PhysicsSimulation sim;
+	sim.objects.push_back({});
+
+	//// Describe the static circle first
+	//PhysicsBody& circle = sim.objects.back();
+	//circle.position = { 400.0f, 400.0f };
+	//circle.radius = 20.0f;
+	//circle.gravityScale = 0.0f;
+
+	//sim.objects.push_back({});
+	//circle = sim.objects.back();
+
+	PhysicsBody* circle = &sim.objects.back();
+	circle->position = { 400.0f, 400.0f };
+	circle->radius = 20.0f;
+	circle->gravityScale = 0.0f;
+	circle->color = GREEN;
+
+	sim.objects.push_back({});
+	circle = &sim.objects.back();
+	circle->position = { 415.0f, 415.0f };
+	circle->radius = 20.0f;
+	circle->gravityScale = 0.0f;
+	circle->color = GREEN;
+
+	PhysicsBody circleStatic, circleDynmamic;
+	circleStatic.position = { 400.0f, 400.0f };
 
 	InitWindow(InitialWidth, InitialHeight, "Angry Birds");
 	SetTargetFPS(sim.TARGET_FPS);
 
 	while (!WindowShouldClose()) // Loops TARGET_FPS times per second
 	{
+		circle->position = GetMousePosition();
+
 		if (IsKeyPressed(KEY_SPACE))
 		{
 			PhysicsBody b;
@@ -128,6 +193,7 @@ int main()
 
 		sim.updateTime();
 		sim.UpdateObjectPositions();
+		sim.CheckCollision();
 		draw(sim);
 	}
 
