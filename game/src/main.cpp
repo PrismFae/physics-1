@@ -9,12 +9,36 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 #include "raygui.h"
 #include "game.h"
 #include <vector>
+#include <cassert>
 
 //struct Circle
 //{
 //	Vector2 position = Vector2Zeros;
 //	float radius = 0.0f;
 //};
+
+enum ColliderType
+{
+	COLLIDER_TYPE_INVALID,
+	COLLIDER_TYPE_CIRCLE,
+	COLLIDER_TYPE_HALF_SPACE
+	// COLLIDER_BOX
+};
+
+// Union to hold different collider types in a single variable
+union Collider
+{
+	struct
+	{
+		float radius;
+	} circle;
+
+	struct
+	{
+		Vector2 normal;
+		float distance;
+	} halfSpace;
+};
 
 struct PhysicsBody
 {
@@ -26,7 +50,10 @@ struct PhysicsBody
 	bool collision = false; // If the body collided this frame
 	Color color = MAGENTA;
 
-	float radius = 0.0f;
+	//float radius = 0.0f;
+
+	ColliderType colliderType = COLLIDER_TYPE_INVALID;
+	Collider collider{};
 };
 
 class PhysicsSimulation
@@ -68,7 +95,26 @@ public:
 			{
 				PhysicsBody& a = objects[i];
 				PhysicsBody& b = objects[j];
-				bool collision = CircleCircle(a.position, a.radius, b.position, b.radius);
+
+				// Ensures both have a type
+				assert(a.colliderType != COLLIDER_TYPE_INVALID && b.colliderType != COLLIDER_TYPE_INVALID);
+				bool collision = false;
+				
+				if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_CIRCLE)
+					collision = CircleCircle(
+						a.position, a.collider.circle.radius, 
+						b.position, b.collider.circle.radius);
+
+				else if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_HALF_SPACE)
+					collision = CircleHalfSpace(
+						a.position, a.collider.circle.radius,
+						b.position, b.collider.halfSpace.normal);
+
+				else if (a.colliderType == COLLIDER_TYPE_HALF_SPACE && b.colliderType == COLLIDER_TYPE_CIRCLE)
+					collision = CircleHalfSpace(
+						b.position, b.collider.circle.radius,
+						a.position, a.collider.halfSpace.normal);
+
 				a.collision |= collision;
 				b.collision |= collision; // only if single true
 			}
@@ -82,6 +128,18 @@ public:
 
 		// If distance between the two radius are less than or equal to distance calculated
 		return distance <= (rad1 + rad2);
+	}
+
+	bool CircleHalfSpace(Vector2 circlePos, float rad, Vector2 posHalfSpace, Vector2 normal)
+	{
+		// Vector from half-space position to circle position (ab = b - a)
+		Vector2 toCircle = circlePos - posHalfSpace;
+
+		//determine distance from circle to half space by scalar projecting AB onto normal
+		float proj = Vector2DotProduct(toCircle, normal);
+
+		// collision if projection less than or equal to radius
+		return proj <= rad;
 	}
 };
 
@@ -125,7 +183,33 @@ void draw(PhysicsSimulation& sim)
 	DrawLineV(launchPosition, launchPosition + velocityVector, RED);
 
 	for (const PhysicsBody& o : sim.objects)
-		DrawCircleV(o.position, o.radius, o.collision ? RED : o.color);
+	{
+		Color colour = o.collision ? RED : o.color;
+		if (o.colliderType == COLLIDER_TYPE_CIRCLE)
+			DrawCircleV(o.position, o.collider.circle.radius, colour);
+		else if (o.colliderType == COLLIDER_TYPE_HALF_SPACE)
+		{
+			// Flip the normal to determine the direction of the half space
+			Vector2 direction = { -o.collider.halfSpace.normal.y, o.collider.halfSpace.normal.x };
+			Vector2 p0 = o.position + direction * 1000.0f;
+			Vector2 p1 = o.position - direction * 1000.0f;
+
+			// Draw the half-space line
+			DrawLineEx(p0, p1, 5.0f,colour);
+
+			// Line to show normal
+			DrawLineEx(o.position, o.position + o.collider.halfSpace.normal * 50.0f, 5.0f, GOLD);
+		}
+	}
+
+	Vector2 circlePos = sim.objects[2].position;
+	Vector2 halfSpacePos = sim.objects[1].position;
+	Vector2 normal = sim.objects[1].collider.halfSpace.normal;
+
+	Vector2 toCircle = circlePos - halfSpacePos;
+	float proj = Vector2DotProduct(toCircle, sim.objects[1].collider.halfSpace.normal);
+	DrawLineEx(halfSpacePos, halfSpacePos + toCircle, 5.0f, BLUE);
+	DrawCircleV(halfSpacePos + normal * proj, 20.0f, PINK);
 
 	EndDrawing();
 }
@@ -133,7 +217,7 @@ void draw(PhysicsSimulation& sim)
 int main()
 {
 	PhysicsSimulation sim;
-	sim.objects.push_back({});
+	PhysicsBody* entity = nullptr;
 
 	//// Describe the static circle first
 	//PhysicsBody& circle = sim.objects.back();
@@ -144,18 +228,31 @@ int main()
 	//sim.objects.push_back({});
 	//circle = sim.objects.back();
 
-	PhysicsBody* circle = &sim.objects.back();
-	circle->position = { 400.0f, 400.0f };
-	circle->radius = 20.0f;
-	circle->gravityScale = 0.0f;
-	circle->color = GREEN;
-
+	// Stationary
 	sim.objects.push_back({});
-	circle = &sim.objects.back();
-	circle->position = { 415.0f, 415.0f };
-	circle->radius = 20.0f;
-	circle->gravityScale = 0.0f;
-	circle->color = GREEN;
+	entity = &sim.objects.back();
+	entity->position = { 500.0f, 200.0f };
+	entity->collider.circle.radius = 20.0f;
+	entity->gravityScale = 0.0f;
+	entity->colliderType = COLLIDER_TYPE_CIRCLE;
+	entity->color = GREEN;
+
+	// Stationary half-space
+	sim.objects.push_back({});
+	entity = &sim.objects.back();
+	entity->position = { 400.0f, 400.0f };
+	entity->gravityScale = 0.0f;
+	entity->colliderType = COLLIDER_TYPE_HALF_SPACE;
+	entity->color = PURPLE;
+	entity->collider.halfSpace.normal = Vector2Rotate(Vector2UnitX, -45.0 * DEG2RAD); // Pointing down 
+
+	// Dynamic
+	sim.objects.push_back({});
+	entity = &sim.objects.back();
+	entity->position = { 415.0f, 415.0f };
+	entity->collider.circle.radius = 20.0f;
+	entity->colliderType = COLLIDER_TYPE_CIRCLE;
+	entity->color = GREEN;
 
 	PhysicsBody circleStatic, circleDynmamic;
 	circleStatic.position = { 400.0f, 400.0f };
@@ -165,7 +262,7 @@ int main()
 
 	while (!WindowShouldClose()) // Loops TARGET_FPS times per second
 	{
-		circle->position = GetMousePosition();
+		entity->position = GetMousePosition();
 
 		if (IsKeyPressed(KEY_SPACE))
 		{
