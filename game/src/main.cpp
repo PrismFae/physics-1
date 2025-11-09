@@ -35,8 +35,8 @@ union Collider
 
 	struct
 	{
-		Vector2 normal;
-		float distance;
+		Vector2 normal; // Direction the half-space is facing
+		float distance; // Distance from 0,0
 	} halfSpace;
 };
 
@@ -99,48 +99,99 @@ public:
 				// Ensures both have a type
 				assert(a.colliderType != COLLIDER_TYPE_INVALID && b.colliderType != COLLIDER_TYPE_INVALID);
 				bool collision = false;
+
+				// mtv = minimum translation vector
+				Vector2 mtv = Vector2Zeros;
 				
 				if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_CIRCLE)
 					collision = CircleCircle(
 						a.position, a.collider.circle.radius, 
-						b.position, b.collider.circle.radius);
+						b.position, b.collider.circle.radius,
+						&mtv);
 
 				else if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_HALF_SPACE)
 					collision = CircleHalfSpace(
 						a.position, a.collider.circle.radius,
-						b.position, b.collider.halfSpace.normal);
+						b.position, b.collider.halfSpace.normal,
+						&mtv);
 
 				else if (a.colliderType == COLLIDER_TYPE_HALF_SPACE && b.colliderType == COLLIDER_TYPE_CIRCLE)
 					collision = CircleHalfSpace(
 						b.position, b.collider.circle.radius,
-						a.position, a.collider.halfSpace.normal);
+						a.position, a.collider.halfSpace.normal,
+						&mtv);
 
 				a.collision |= collision;
 				b.collision |= collision; // only if single true
+
+				if (collision)
+				{
+					// move only circles
+					if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_HALF_SPACE)
+						a.position += mtv;
+					if (a.colliderType == COLLIDER_TYPE_HALF_SPACE && b.colliderType == COLLIDER_TYPE_CIRCLE)
+						b.position += mtv; 
+
+					if (a.colliderType == COLLIDER_TYPE_CIRCLE && b.colliderType == COLLIDER_TYPE_CIRCLE)
+					{
+						// Move both circles apart equally
+						a.position += mtv * 0.5f;
+						b.position -= mtv * 0.5f;
+					}
+				}
+
 			}
 		}
 	}
 
-	bool CircleCircle(Vector2 pos1, float rad1, Vector2 pos2, float rad2)
+	bool CircleCircle(Vector2 pos1, float rad1, Vector2 pos2, float rad2, Vector2* mtv = nullptr)
 	{
 		// distance calculated by pythagorean
 		float distance = Vector2Distance(pos1, pos2);
 
+		// lab 5
+		float radii_sum = rad1 + rad2;
+		bool collision = distance <= radii_sum;
+
+		if (collision && mtv != nullptr)
+		{
+			// direction from circle 2 to circle 1
+			Vector2 direction = Vector2Subtract(pos1, pos2);
+			direction = Vector2Normalize(direction);
+			// overlap distance
+			float overlap = radii_sum - distance;
+			// minimum translation vector
+			*mtv = direction * overlap;
+		}
+
 		// If distance between the two radius are less than or equal to distance calculated
-		return distance <= (rad1 + rad2);
+		return collision;
 	}
 
-	bool CircleHalfSpace(Vector2 circlePos, float rad, Vector2 posHalfSpace, Vector2 normal)
+	bool CircleHalfSpace(Vector2 circlePos, float rad, Vector2 posHalfSpace, Vector2 normal, Vector2* mtv = nullptr)
 	{
 		// Vector from half-space position to circle position (ab = b - a)
 		Vector2 toCircle = circlePos - posHalfSpace;
 
-		//determine distance from circle to half space by scalar projecting AB onto normal
+		// Determine distance from circle to half-space by scalar projecting AB onto normal
 		float proj = Vector2DotProduct(toCircle, normal);
 
-		// collision if projection less than or equal to radius
-		return proj <= rad;
+		// The circle is colliding if its center is closer to the plane than its radius
+		bool collision = proj <= rad;
+
+		if (collision && mtv != nullptr)
+		{
+			// depth = how far the circle is inside the half-space
+			float depth = rad - proj;
+
+			// MTV pushes the circle out along the plane's normal
+			*mtv = normal * depth;
+		}
+
+		// Collision if projection less than or equal to radius
+		return collision;
 	}
+
 };
 
 
@@ -154,33 +205,33 @@ void draw(PhysicsSimulation& sim)
 	BeginDrawing();
 	ClearBackground(WHITE);
 
-	// Slider variables
-	float rectangleWidth = 400;
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 15, rectangleWidth, 20 }, "Launch Angle", 
-		TextFormat("%.2f", launchAngle), &launchAngle, 0, 360.0f);
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 45, rectangleWidth, 20 }, "Launch Speed", 
-		TextFormat("%.2f", launchSpeed), &launchSpeed, 25, 200);
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 75, rectangleWidth, 20 }, "Launch X", 
-		TextFormat("%.2f", launchPosition.x), &launchPosition.x, 0, GetScreenWidth());
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 105, rectangleWidth, 20 }, "Launch Y", 
-		TextFormat("%.2f", launchPosition.y), &launchPosition.y, 0, GetScreenHeight());
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 135, rectangleWidth, 20 }, "Gravity Y",
-		TextFormat("%.2f", sim.gravity.y), & sim.gravity.y, -20, 20);
-	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 165, rectangleWidth, 20 }, "Gravity x",
-		TextFormat("%.2f", sim.gravity.x), &sim.gravity.x, -15, 15);
+	//// Slider variables2
+	//float rectangleWidth = 400;
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 15, rectangleWidth, 20 }, "Launch Angle", 
+	//	TextFormat("%.2f", launchAngle), &launchAngle, 0, 360.0f);
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 45, rectangleWidth, 20 }, "Launch Speed", 
+	//	TextFormat("%.2f", launchSpeed), &launchSpeed, 25, 200);
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 75, rectangleWidth, 20 }, "Launch X", 
+	//	TextFormat("%.2f", launchPosition.x), &launchPosition.x, 0, GetScreenWidth());
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 105, rectangleWidth, 20 }, "Launch Y", 
+	//	TextFormat("%.2f", launchPosition.y), &launchPosition.y, 0, GetScreenHeight());
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 135, rectangleWidth, 20 }, "Gravity Y",
+	//	TextFormat("%.2f", sim.gravity.y), & sim.gravity.y, -20, 20);
+	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 165, rectangleWidth, 20 }, "Gravity x",
+	//	TextFormat("%.2f", sim.gravity.x), &sim.gravity.x, -15, 15);
 
-	// Text for slider variables
-	DrawText(TextFormat("Angle: %.2f", launchAngle), 10, 15, 20, BLACK);
-	DrawText(TextFormat("Speed: %.2f", launchSpeed), 10, 45, 20, BLACK);
-	DrawText(TextFormat("Launch Position: (%.2f, %.2f)", launchPosition.x, launchPosition.y), 10, 75, 20, BLACK);
-	DrawText(TextFormat("Gravity: (%.2f, %.2f)", sim.gravity.x, sim.gravity.y), 10, 105, 20, BLACK);
+	//// Text for slider variables
+	//DrawText(TextFormat("Angle: %.2f", launchAngle), 10, 15, 20, BLACK);
+	//DrawText(TextFormat("Speed: %.2f", launchSpeed), 10, 45, 20, BLACK);
+	//DrawText(TextFormat("Launch Position: (%.2f, %.2f)", launchPosition.x, launchPosition.y), 10, 75, 20, BLACK);
+	//DrawText(TextFormat("Gravity: (%.2f, %.2f)", sim.gravity.x, sim.gravity.y), 10, 105, 20, BLACK);
 
-	// Circle representing the launch position
-	DrawCircleV(launchPosition, 10, ORANGE);
+	//// Circle representing the launch position
+	//DrawCircleV(launchPosition, 10, ORANGE);
 
-	// Line representing the launch angle and speed
-	Vector2 velocityVector = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
-	DrawLineV(launchPosition, launchPosition + velocityVector, RED);
+	//// Line representing the launch angle and speed
+	//Vector2 velocityVector = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
+	//DrawLineV(launchPosition, launchPosition + velocityVector, RED);
 
 	for (const PhysicsBody& o : sim.objects)
 	{
@@ -208,8 +259,8 @@ void draw(PhysicsSimulation& sim)
 
 	Vector2 toCircle = circlePos - halfSpacePos;
 	float proj = Vector2DotProduct(toCircle, sim.objects[1].collider.halfSpace.normal);
-	DrawLineEx(halfSpacePos, halfSpacePos + toCircle, 5.0f, BLUE);
-	DrawCircleV(halfSpacePos + normal * proj, 20.0f, PINK);
+	//DrawLineEx(halfSpacePos, halfSpacePos + toCircle, 5.0f, BLUE);
+	//DrawCircleV(halfSpacePos + normal * proj, 20.0f, PINK);
 
 	EndDrawing();
 }
@@ -231,9 +282,19 @@ int main()
 	// Stationary
 	sim.objects.push_back({});
 	entity = &sim.objects.back();
-	entity->position = { 500.0f, 200.0f };
+	entity->position = { 350.0f, 300.0f };
 	entity->collider.circle.radius = 20.0f;
 	entity->gravityScale = 0.0f;
+	entity->colliderType = COLLIDER_TYPE_CIRCLE;
+	entity->color = GREEN;
+
+	// Gravity affected circle
+	// Stationary
+	sim.objects.push_back({});
+	entity = &sim.objects.back();
+	entity->position = { 350.0f, 200.0f };
+	entity->collider.circle.radius = 20.0f;
+	entity->gravityScale = 1.0f;
 	entity->colliderType = COLLIDER_TYPE_CIRCLE;
 	entity->color = GREEN;
 
@@ -244,7 +305,7 @@ int main()
 	entity->gravityScale = 0.0f;
 	entity->colliderType = COLLIDER_TYPE_HALF_SPACE;
 	entity->color = PURPLE;
-	entity->collider.halfSpace.normal = Vector2Rotate(Vector2UnitX, -45.0 * DEG2RAD); // Pointing down 
+	entity->collider.halfSpace.normal = Vector2Rotate(Vector2UnitX, -45.0f * DEG2RAD); // Pointing down 
 
 	// Dynamic
 	sim.objects.push_back({});
