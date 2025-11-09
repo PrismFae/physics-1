@@ -89,6 +89,10 @@ public:
 
 	void CheckCollision()
 	{
+		// No collision possible
+		if (objects.size() < 2)
+			return; 
+
 		for (int i = 0; i < objects.size(); ++i)
 		{
 			for (int j = i + 1; j < objects.size(); ++j)
@@ -195,7 +199,7 @@ public:
 };
 
 
-Vector2 launchPosition = { 200, 200 };
+Vector2 launchPosition = { 600, 100 };
 float launchAngle = 300.0f;
 float launchSpeed = 150.0f;
 
@@ -206,13 +210,13 @@ void draw(PhysicsSimulation& sim)
 	ClearBackground(WHITE);
 
 	//// Slider variables2
-	//float rectangleWidth = 400;
+	float rectangleWidth = 400;
 	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 15, rectangleWidth, 20 }, "Launch Angle", 
 	//	TextFormat("%.2f", launchAngle), &launchAngle, 0, 360.0f);
 	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 45, rectangleWidth, 20 }, "Launch Speed", 
 	//	TextFormat("%.2f", launchSpeed), &launchSpeed, 25, 200);
-	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 75, rectangleWidth, 20 }, "Launch X", 
-	//	TextFormat("%.2f", launchPosition.x), &launchPosition.x, 0, GetScreenWidth());
+	GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 75, rectangleWidth, 20 }, "Launch X", 
+		TextFormat("%.2f", launchPosition.x), &launchPosition.x, 0, GetScreenWidth());
 	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 105, rectangleWidth, 20 }, "Launch Y", 
 	//	TextFormat("%.2f", launchPosition.y), &launchPosition.y, 0, GetScreenHeight());
 	//GuiSliderBar(Rectangle{ InitialWidth - rectangleWidth - 60, 135, rectangleWidth, 20 }, "Gravity Y",
@@ -227,7 +231,7 @@ void draw(PhysicsSimulation& sim)
 	//DrawText(TextFormat("Gravity: (%.2f, %.2f)", sim.gravity.x, sim.gravity.y), 10, 105, 20, BLACK);
 
 	//// Circle representing the launch position
-	//DrawCircleV(launchPosition, 10, ORANGE);
+	DrawCircleV(launchPosition, 10, ORANGE);
 
 	//// Line representing the launch angle and speed
 	//Vector2 velocityVector = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
@@ -279,14 +283,14 @@ int main()
 	//sim.objects.push_back({});
 	//circle = sim.objects.back();
 
-	// Stationary
-	sim.objects.push_back({});
-	entity = &sim.objects.back();
-	entity->position = { 350.0f, 300.0f };
-	entity->collider.circle.radius = 20.0f;
-	entity->gravityScale = 0.0f;
-	entity->colliderType = COLLIDER_TYPE_CIRCLE;
-	entity->color = GREEN;
+	//// Stationary
+	//sim.objects.push_back({});
+	//entity = &sim.objects.back();
+	//entity->position = { 350.0f, 300.0f };
+	//entity->collider.circle.radius = 20.0f;
+	//entity->gravityScale = 0.0f;
+	//entity->colliderType = COLLIDER_TYPE_CIRCLE;
+	//entity->color = GREEN;
 
 	// Gravity affected circle
 	// Stationary
@@ -298,7 +302,7 @@ int main()
 	entity->colliderType = COLLIDER_TYPE_CIRCLE;
 	entity->color = GREEN;
 
-	// Stationary half-space
+	// Stationary half-space -45 degrees
 	sim.objects.push_back({});
 	entity = &sim.objects.back();
 	entity->position = { 400.0f, 400.0f };
@@ -307,29 +311,41 @@ int main()
 	entity->color = PURPLE;
 	entity->collider.halfSpace.normal = Vector2Rotate(Vector2UnitX, -45.0f * DEG2RAD); // Pointing down 
 
-	// Dynamic
+	// Stationary half-space 45 degrees
 	sim.objects.push_back({});
 	entity = &sim.objects.back();
-	entity->position = { 415.0f, 415.0f };
-	entity->collider.circle.radius = 20.0f;
-	entity->colliderType = COLLIDER_TYPE_CIRCLE;
-	entity->color = GREEN;
+	entity->position = { 800.0f, 400.0f };
+	entity->gravityScale = 0.0f;
+	entity->colliderType = COLLIDER_TYPE_HALF_SPACE;
+	entity->color = PURPLE;
+	entity->collider.halfSpace.normal = Vector2Rotate(Vector2UnitX, 225.0f * DEG2RAD); // Pointing down 
 
-	PhysicsBody circleStatic, circleDynmamic;
-	circleStatic.position = { 400.0f, 400.0f };
+	//// Dynamic
+	//sim.objects.push_back({});
+	//entity = &sim.objects.back();
+	//entity->position = { 415.0f, 415.0f };
+	//entity->collider.circle.radius = 20.0f;
+	//entity->colliderType = COLLIDER_TYPE_CIRCLE;
+	//entity->color = GREEN;
+
+	//PhysicsBody circleStatic, circleDynmamic;
+	//circleStatic.position = { 400.0f, 400.0f };
 
 	InitWindow(InitialWidth, InitialHeight, "Angry Birds");
 	SetTargetFPS(sim.TARGET_FPS);
 
 	while (!WindowShouldClose()) // Loops TARGET_FPS times per second
 	{
-		entity->position = GetMousePosition();
+		//entity->position = GetMousePosition();
 
 		if (IsKeyPressed(KEY_SPACE))
 		{
 			PhysicsBody b;
 			b.position = launchPosition;
-			b.velocity = Vector2Rotate(Vector2UnitX, DEG2RAD * launchAngle) * launchSpeed;
+			b.velocity = Vector2Rotate(Vector2UnitX, DEG2RAD * 90) * launchSpeed;
+			b.colliderType = COLLIDER_TYPE_CIRCLE;
+			b.collider.circle.radius = 20.0f;
+			b.color = GREEN;
 			
 			sim.objects.push_back(b);
 		}
